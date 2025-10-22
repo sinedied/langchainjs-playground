@@ -1,37 +1,40 @@
-// This example demonstrates how to use the OpenAI API to stream the chat
-// response to the console, to provide a more interactive experience.
+import * as z from "zod";
+import { createAgent, tool } from "langchain";
+import "dotenv/config";
 
-import { OpenAI } from "openai";
-import config from "./config.js";
+const getJokes = tool(
+  async ({ keyword }) => {
+    const result = await fetch(`https://api.chucknorris.io/jokes/search?query=${keyword}`);
+    return result.json();
+  },
+  {
+    name: "get_jokes",
+    description: "Search for Chuck Norris jokes based on a keyword.",
+    schema: z.object({
+      keyword: z.string(),
+    }),
+  },
+);
 
-const openai = new OpenAI({ ...config });
-
-const chunks = await openai.chat.completions.create({
-  model: config.model,
-  messages: [{ role: "user", content: "Say hello in pirate style, then tell a pirate joke." }],
-  stream: true,
-  // Effort level for reasoning (low, medium, high)
-  // Higher levels may yield more accurate results but take longer
-  reasoning_effort: "low",
+const agent = createAgent({
+  model: "azure_openai:gpt-5-mini",
+  tools: [getJokes],
+  systemPrompt: "You're a humor assistant that use available tool to provide a joke based on user query.",
 });
 
-let reasoning = true;
-console.log("Thoughts:");
+const events = await agent.stream({
+    messages: [{ role: "user", content: "Make me laugh with cats" }],
+  },
+  { streamMode: ['updates'] }
+);
 
-for await (const chunk of chunks) {
-  const delta = chunk.choices[0]?.delta;
+for await (const [type, event] of events) {
+  // console.log(type);
+  // console.log(event);
 
-  if ((delta as any)?.reasoning) {
-    process.stdout.write((delta as any).reasoning);
-  }
-
-  // Check if reasoning is complete
-  if (reasoning && delta?.content) {
-    console.log("\n---");
-    reasoning = false;
-  }
-
-  if (delta?.content) {
-    process.stdout.write(delta.content);
+  if (event.model_request) {
+    console.log("\nModel:", event.model_request.messages[0]?.content || event.model_request.messages[0]?.tool_calls[0]);
+  } else if (event.tools) {
+    console.log(`\nTool: ${event.tools.messages[0].name} response received`);
   }
 }

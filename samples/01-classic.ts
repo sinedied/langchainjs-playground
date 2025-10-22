@@ -1,7 +1,12 @@
+import { initChatModel } from "langchain";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { AzureChatOpenAI } from "@langchain/openai";
+import "dotenv/config";
 
-const model = new AzureChatOpenAI();
+const model = new AzureChatOpenAI({ model: "gpt-5-mini" });
+
+// Or use the new helper
+// const model = await initChatModel("azure_openai:gpt-5-mini");
 
 const chunks = await ChatPromptTemplate.fromMessages([["human", "{input}"]])
   .pipe(model)
