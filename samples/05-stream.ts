@@ -22,9 +22,8 @@ const agent = createAgent({
   systemPrompt: "You're a humor assistant that use available tool to provide a joke based on user query.",
 });
 
-const events = await agent.stream({
-    messages: [{ role: "user", content: "Make me laugh with cats" }],
-  },
+const events = await agent.stream(
+  { messages: [{ role: "user", content: "Make me laugh with cats" }] },
   { streamMode: ['updates'] }
 );
 

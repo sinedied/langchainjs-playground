@@ -1,46 +1,43 @@
-// This example demonstrates how to extract structured information from a
-// a given input text using a JSON schema.
+import * as z from "zod";
+import { createAgent, tool, humanInTheLoopMiddleware } from "langchain";
+import { MemorySaver } from "@langchain/langgraph";
+import "dotenv/config";
 
-import { OpenAI } from "openai";
-import config from "./config.js";
-
-const openai = new OpenAI({ ...config });
-
-const systemPrompt = `You are a data extraction tool that extracts structured JSON information from the user input using this JSON schema:
-
-{
-  // The sentiment of the text
-  "sentiment": "positive" | "neutral" | "negative",
-  // How aggressive the text is on a scale from 1 to 10
-  "aggressiveness": 1-10,
-  // The language the text is written in
-  "language": "string"
-}`;
-
-const input = `Cet exemple est pas trop mal!`;
-
-const result = await openai.chat.completions.create({
-  model: config.model,
-  messages: [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: input },
-  ],
-  // Note: structured outputs currently do not work with Ollama,
-  // see issue: https://github.com/ollama/ollama/issues/11691
-  // Meanwhile, you can comment out response_format to use the default output
-  response_format: {
-    type: "json_object",
+const getJokes = tool(
+  async ({ keyword }) => {
+    const result = await fetch(`https://api.chucknorris.io/jokes/search?query=${keyword}`);
+    return result.json();
   },
-  // Randomness of the completion (0: deterministic, 1: maximum randomness)
-  temperature: 0.2,
-  // Effort level for reasoning (low, medium, high)
-  // Higher levels may yield more accurate results but take longer
-  reasoning_effort: "low",
+  {
+    name: "get_jokes",
+    description: "Search for Chuck Norris jokes based on a keyword.",
+    schema: z.object({
+      keyword: z.string(),
+    }),
+  },
+);
+
+const checkpointer = new MemorySaver();
+
+const agent = createAgent({
+  model: "azure_openai:gpt-5-mini",
+  tools: [getJokes],
+  systemPrompt: "You're a humor assistant that use available tool to provide a joke based on user query.",
+
+  checkpointer,
+  middleware: [humanInTheLoopMiddleware({
+    interruptOn: {
+      // Require approval before calling tool
+      get_jokes: {
+        allowedDecisions: ["approve", "reject"],
+      },
+    }
+  })],
 });
 
 console.log(
-  "Thoughts:\n" +
-  (result.choices[0].message as any).reasoning +
-  "\n---\n" +
-  result.choices[0].message.content
+  await agent.invoke(
+    { messages: [{ role: "user", content: "Make me laugh with cats" }] },
+    { configurable: { thread_id: "1" } }
+  )
 );
