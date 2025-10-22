@@ -1,0 +1,11 @@
+{
+  "code-runner.executorMap": {
+    "typescript": "tsx",
+  },
+  "code-runner.clearPreviousOutput": true,
+  "code-runner.saveFileBeforeRun": true,
+  "workbench.colorCustomizations": {
+    "statusBar.background": "#2a7f4e",
+    "statusBar.foreground": "#ffffff"
+  },
+}
